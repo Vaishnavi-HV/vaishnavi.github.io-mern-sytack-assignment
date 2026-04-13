@@ -1,0 +1,80 @@
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+
+// REGISTER
+router.post("/register", async (req, res) => {
+    const { name, email, password } = req.body;
+
+    const hashed = await bcrypt.hash(password, 10);
+
+    await db.query(
+        "INSERT INTO users (name,email,password) VALUES (?,?,?)",
+        [name, email, hashed]
+    );
+
+    res.json({ msg: "User Registered" });
+});
+
+// LOGIN
+router.post("/login", async (req, res) => {
+    const { email, password } = req.body;
+
+    const [user] = await db.query("SELECT * FROM users WHERE email=?", [email]);
+
+    if (user.length === 0) return res.status(400).json({ msg: "User not found" });
+
+    const valid = await bcrypt.compare(password, user[0].password);
+    if (!valid) return res.status(400).json({ msg: "Wrong password" });
+
+    const token = jwt.sign({ id: user[0].id }, process.env.JWT_SECRET);
+
+    res.json({ token });
+});
+
+// FORGOT PASSWORD
+router.post("/forgot-password", async (req, res) => {
+    const { email } = req.body;
+
+    const token = Math.random().toString(36).substring(2);
+
+    await db.query(
+        "UPDATE users SET reset_token=? WHERE email=?",
+        [token, email]
+    );
+
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS
+        }
+    });
+
+    await transporter.sendMail({
+        to: email,
+        subject: "Reset Password",
+        text: `Token: ${token}`
+    });
+
+    res.json({ msg: "Email sent" });
+});
+
+// RESET PASSWORD
+router.post("/reset-password", async (req, res) => {
+    const { token, newPassword } = req.body;
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await db.query(
+        "UPDATE users SET password=?, reset_token=NULL WHERE reset_token=?",
+        [hashed, token]
+    );
+
+    res.json({ msg: "Password updated" });
+});
+
+module.exports = router;
