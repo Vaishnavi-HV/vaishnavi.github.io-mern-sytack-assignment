@@ -1,0 +1,45 @@
+const express = require("express");
+const router = express.Router();
+const db = require("../config/db");
+const auth = require("../middleware/auth");
+
+// GET ALL ITEMS
+router.get("/", auth, async (req, res) => {
+    const [items] = await db.query(
+        "SELECT * FROM items WHERE user_id=?",
+        [req.user.id]
+    );
+    res.json(items);
+});
+
+// CREATE ITEM
+router.post("/", auth, async (req, res) => {
+    const { title, description } = req.body;
+
+    await db.query(
+        "INSERT INTO items (user_id,title,description) VALUES (?,?,?)",
+        [req.user.id, title, description]
+    );
+
+    res.json({ msg: "Item created" });
+});
+
+// UPDATE ITEM
+router.put("/:id", auth, async (req, res) => {
+    const { title, description } = req.body;
+
+    await db.query(
+        "UPDATE items SET title=?, description=? WHERE id=?",
+        [title, description, req.params.id]
+    );
+
+    res.json({ msg: "Updated" });
+});
+
+// DELETE ITEM
+router.delete("/:id", auth, async (req, res) => {
+    await db.query("DELETE FROM items WHERE id=?", [req.params.id]);
+    res.json({ msg: "Deleted" });
+});
+
+module.exports = router;
