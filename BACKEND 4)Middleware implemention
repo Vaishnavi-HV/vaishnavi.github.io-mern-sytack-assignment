@@ -1,0 +1,22 @@
+const express = require("express");
+const cors = require("cors");
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+// Custom middleware
+app.use(require("./middleware/logger"));
+
+// Routes
+app.use("/api/auth", require("./routes/auth"));
+app.use("/api/items", require("./routes/items"));
+
+// Not Found
+app.use(require("./middleware/notFound"));
+
+// Error Handler (last)
+app.use(require("./middleware/errorHandler"));
+
+app.listen(3000, () => console.log("Server running"));
